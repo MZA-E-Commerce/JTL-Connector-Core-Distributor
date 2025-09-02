@@ -84,10 +84,6 @@ class CustomerOrderController extends AbstractController implements PullInterfac
                 $attributeCustomerGroup->setValue(self::CUSTOMER_TYPE_B2B);
                 $order->addAttribute($attributeCustomerGroup);
 
-                // ToDo:
-                // 1. Versandart "Click & Collect" (Andreas fragen) -> Versandart in WaWi auf "Abholung" setzen
-                // 2. Händlernummer als Auftragsmerkmal setzen
-
                 // Shipping address
                 $shippingAddress = new CustomerOrderShippingAddress();
                 $shippingAddress->setCountryIso(!empty($orderData['lieferLand']) ? $orderData['lieferLand'] : 'DE'); // Default to 'DE' if not set
