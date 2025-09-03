@@ -198,11 +198,6 @@ abstract class AbstractController
                 break;
         }
 
-        file_put_contents('/var/www/html/var/log/prices.log', 'PRICES 
-                            | Date: ' . date('d.m.Y H:i:s') . ' 
-                            | Data: ' . print_r($postDataPrices, true) . PHP_EOL . PHP_EOL, FILE_APPEND);
-
-return;
         if (!empty($postDataPrices)) {
 
             foreach ($postDataPrices as $endpointType => $data) {
