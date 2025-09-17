@@ -16,6 +16,6 @@ class ProductController extends AbstractController
 
     protected function updateModel(Product $model): void
     {
-        $this->updateProductEndpoint($model, self::UPDATE_TYPE_PRODUCT_PRICE);
+        $this->updateProductEndpoint($model);
     }
 }

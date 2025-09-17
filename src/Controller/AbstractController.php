@@ -41,7 +41,7 @@ abstract class AbstractController
     /**
      * @var string
      */
-    protected const UPDATE_TYPE_CUSTOMER_ORDERS = 'geCustomerOrders';
+    protected const UPDATE_TYPE_CUSTOMER_ORDERS = 'getCustomerOrders';
 
     /**
      * @var string
@@ -196,6 +196,20 @@ abstract class AbstractController
                 $this->logger->info('Updating product prices (SKU: ' . $product->getSku() . ')');
                 $postDataPrices = $this->getPrices($product, $priceTypes);
                 break;
+            case self::UPDATE_TYPE_PRODUCT:
+                $this->logger->info('Updating product data (SKU: ' . $product->getSku() . ')');
+
+                $tmpUpeData = [];
+                $uvpNet = $product->getRecommendedRetailPrice();
+                if (!is_null($uvpNet)) {
+                    $vat = $product->getVat();
+                    $uvpGross = $uvpNet * (1 + $vat / 100);
+                    $tmpUpeData[self::STUECKPREIS][$priceTypes['UPE']] = [
+                        "value" => round($uvpGross, 4)
+                    ];
+                }
+                $postDataPrices = array_merge_recursive($tmpUpeData, $this->getPrices($product, $priceTypes));
+                break;
         }
 
         if (!empty($postDataPrices)) {
@@ -215,12 +229,14 @@ abstract class AbstractController
                         file_put_contents('/var/www/html/var/log/urls.log', 'API URLS 
                             | Date: ' . date('d.m.Y H:i:s') . ' 
                             | Method: ' . $httpMethod . ' 
+                            | Type: ' . $type . ' 
                             | URL: ' . $fullApiUrl2 . ' 
                             | Data: ' . print_r($jsonData, true) . PHP_EOL . PHP_EOL, FILE_APPEND);
                     } else {
                         file_put_contents('/home/www/p689712/html/jtl-connector-haendlershop/var/log/urls.log', 'API URLS 
                             | Date: ' . date('d.m.Y H:i:s') . ' 
                             | Method: ' . $httpMethod . ' 
+                            | Type: ' . $type . ' 
                             | URL: ' . $fullApiUrl2 . ' 
                             | Data: ' . print_r($jsonData, true) . PHP_EOL . PHP_EOL, FILE_APPEND);
                     }
@@ -286,21 +302,13 @@ abstract class AbstractController
     {
         $result = [];
 
-        $vat = $product->getVat();
-        $uvpNet = $product->getRecommendedRetailPrice();
-        $uvpGross = $uvpNet * (1 + $vat / 100);
-
-        $result[self::STUECKPREIS][$priceTypes['UPE']] = [
-            "value" => round($uvpGross, 4)
-        ];
-
         // 1) regular prices
         foreach ($product->getPrices() as $priceModel) {
             if ($priceModel->getCustomerGroupId()->getEndpoint() == self::CUSTOMER_TYPE_B2B) {
                 $priceType = $priceTypes[self::CUSTOMER_TYPE_B2B_SHORTCUT];
                 foreach ($priceModel->getItems() as $item) {
                     $result[self::STUECKPREIS][$priceType] = [
-                        "value" => $item->getNetPrice(),
+                        "value" => $item->getNetPrice()
                     ];
                     break;
                 }
