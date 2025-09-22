@@ -1,39 +1,39 @@
 {
+  "log": {
+    "level": "error"
+  },
   "db": {
-    "host": "jtl-connector-db",
+    "host": "jtl-connector-distributor-mysql",
     "name": "jtl-connector",
     "username": "jtl-connector",
     "password": "jtl-connector"
   },
-  "token": "1234567890",
-  "pimcore": {
+  "token": "xxx",
+  "useGrossPrices": false,
+  "priceTypes": {
+    "MZA B2B": "VK4",
+    "UPE": "VK23"
+  },
+  "endpoint": {
     "api": {
-      "url": "http://mza-nginx/api/jtl/connector",
-      "key": "1234567890",
+      "url": "https://test-shop-service.mza-vertrieb.de/api",
+      "key": "xxx",
       "endpoints": {
-        "getId": {
-          "method": "GET",
-          "url": "/getId?sku={sku}"
-        },
         "setProductStockLevel": {
           "method": "POST",
-          "url": "/setProductStockLevel"
+          "url": "/artikel/lagerbestand"
         },
         "setProductPrice": {
-          "method": "POST",
-          "url": "/setProductPrice"
+          "method": "PUT",
+          "url": "/verkaufspreise/{sku}/{priceType}/{endpointType}"
         },
         "setProductData": {
-          "method": "POST",
-          "url": "/setProductData"
+          "method": "PUT",
+          "url": "/verkaufspreise/{sku}/{priceType}/{endpointType}"
         },
-        "getOrders": {
+        "getCustomerOrders": {
           "method": "GET",
-          "url": "/getOrders"
-        },
-        "getCustomers": {
-          "method": "GET",
-          "url": "/getCustomers"
+          "url": "/transferauftraege/pending"
         }
       }
     }
