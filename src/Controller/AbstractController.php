@@ -254,7 +254,7 @@ abstract class AbstractController
                 $statusCode = $response->getStatusCode();
                 $responseData = $response->toArray();
 
-                if ($statusCode === 200 && isset($responseData['artikelNr']) && $responseData['artikelNr'] === $product->getSku()) {
+                if ($statusCode === 200 && isset($responseData['data']['transferID']) && $responseData['data']['artikelNr'] === $product->getSku()) {
                     $this->logger->info('Product price updated successfully (SKU: ' . $product->getSku() . ')');
                     return;
                 }
