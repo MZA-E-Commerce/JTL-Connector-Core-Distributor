@@ -53,6 +53,11 @@ abstract class AbstractController
      */
     const SONDERPREIS = 'sonderpreis';
 
+    const MAPPING_TAX_CLASSES = [
+        '1' => 19,
+        '2' => 7,
+    ];
+
     /**
      * @var CoreConfigInterface
      */
@@ -180,8 +185,6 @@ abstract class AbstractController
         $client = $this->getHttpClient();
         $fullApiUrl = $this->getEndpointUrl($type);
 
-        $fullApiUrl = str_replace('{sku}', $product->getSku(), $fullApiUrl);
-
         $postData = [];
         $postDataPrices = [];
         $priceTypes = $this->config->get('priceTypes');
@@ -222,54 +225,44 @@ abstract class AbstractController
 
         if (!empty($postDataPrices)) {
 
-            foreach ($postDataPrices as $endpointType => $data) {
+            $postDataPrices = $this->convert($postDataPrices, $product->getSku(), $product->getVat());
 
-                $fullApiUrl1 = str_replace('{endpointType}', $endpointType, $fullApiUrl);
-
-                foreach ($data as $priceType => $jsonData) {
-
-                    $fullApiUrl2 = str_replace('{priceType}', $priceType, $fullApiUrl1);
-
-                    $this->logger->info('API URLS | Method: ' . $httpMethod . ' | URL: ' . $fullApiUrl2 . ' | Data: ' . json_encode($jsonData));
-
-                    $serverName = $_SERVER['SERVER_NAME'] ?? gethostname();
-                    if ($serverName == 'jtl-connector.docker') {
-                        file_put_contents('/var/www/html/var/log/urls.log', 'API URLS 
+            $serverName = $_SERVER['SERVER_NAME'] ?? gethostname();
+            if ($serverName == 'jtl-connector.docker') {
+                file_put_contents('/var/www/html/var/log/postDataPrices.log', 'PostData: 
                             | Date: ' . date('d.m.Y H:i:s') . ' 
                             | Method: ' . $httpMethod . ' 
                             | Type: ' . $type . ' 
-                            | URL: ' . $fullApiUrl2 . ' 
-                            | Data: ' . print_r($jsonData, true) . PHP_EOL . PHP_EOL, FILE_APPEND);
-                    } else {
-                        file_put_contents('/home/www/p689712/html/jtl-connector-haendlershop/var/log/urls.log', 'API URLS 
+                            | URL: ' . $fullApiUrl . ' 
+                            | Data: ' . print_r($postDataPrices, true) . PHP_EOL . PHP_EOL, FILE_APPEND);
+            } else {
+                file_put_contents('/home/www/p689712/html/jtl-connector-haendlershop/var/log/postDataPrices.log', 'PostData: 
                             | Date: ' . date('d.m.Y H:i:s') . ' 
                             | Method: ' . $httpMethod . ' 
                             | Type: ' . $type . ' 
-                            | URL: ' . $fullApiUrl2 . ' 
-                            | Data: ' . print_r($jsonData, true) . PHP_EOL . PHP_EOL, FILE_APPEND);
-                    }
+                            | URL: ' . $fullApiUrl . ' 
+                            | Data: ' . print_r($postDataPrices, true) . PHP_EOL . PHP_EOL, FILE_APPEND);
+            }
 
-                    if ($jsonData['value'] <= 0) {
-                        $this->logger->info('Skipping update for price type ' . $priceType . ' with value ' . $jsonData['value'] . ' (SKU: ' . $product->getSku() . ')');
-                        continue;
-                    }
+            if ($postDataPrices['stueckpreis'] <= 0) {
+                $this->logger->info('Skipping update for price type ' . $postDataPrices['bezeichnung'] . ' with value ' . $postDataPrices['stueckpreis'] . ' (SKU: ' . $product->getSku() . ')');
+                return;
+            }
 
-                    try {
-                        $response = $client->request($httpMethod, $fullApiUrl2, ['json' => $jsonData]);
-                        $statusCode = $response->getStatusCode();
-                        $responseData = $response->toArray();
+            try {
+                $response = $client->request($httpMethod, $fullApiUrl, ['json' => $postDataPrices]);
+                $statusCode = $response->getStatusCode();
+                $responseData = $response->toArray();
 
-                        if ($statusCode === 200 && isset($responseData['artikelNr']) && $responseData['artikelNr'] === $product->getSku()) {
-                            $this->logger->info('Product price updated successfully (SKU: ' . $product->getSku() . ')');
-                            continue;
-                        }
-
-                        throw new \RuntimeException('API error: ' . ($data['error'] ?? 'Unknown error'));
-
-                    } catch (TransportExceptionInterface|HttpExceptionInterface|DecodingExceptionInterface $e) {
-                        throw new \RuntimeException('HTTP request failed: ' . $e->getMessage(), 0, $e);
-                    }
+                if ($statusCode === 200 && isset($responseData['artikelNr']) && $responseData['artikelNr'] === $product->getSku()) {
+                    $this->logger->info('Product price updated successfully (SKU: ' . $product->getSku() . ')');
+                    return;
                 }
+
+                throw new \RuntimeException('API error: ' . ($data['error'] ?? 'Unknown error'));
+
+            } catch (TransportExceptionInterface|HttpExceptionInterface|DecodingExceptionInterface $e) {
+                throw new \RuntimeException('HTTP request failed: ' . $e->getMessage(), 0, $e);
             }
         }
 
@@ -348,5 +341,27 @@ abstract class AbstractController
         }
 
         return $result;
+    }
+
+    /*
+     * Convert price data to endpoint format
+     */
+    private function convert(array $inputArray, string $articleNumber, float $taxValue = 19)
+    {
+        $priceType = array_key_first($inputArray['stueckpreis'] ?? []) ?? '';
+        $priceValue = $inputArray['stueckpreis'][$priceType]['value'] ?? 0;
+
+        $taxKey = array_search($taxValue, self::MAPPING_TAX_CLASSES);
+        if ($taxKey === false) {
+            $taxKey = '1';
+        }
+
+        return [
+            'artikelNr' => $articleNumber,
+            'bezeichnung' => $priceType,
+            'stueckpreis' => $priceValue,
+            'mwSt' => $taxValue,
+            'stSchl' => $taxKey
+        ];
     }
 }

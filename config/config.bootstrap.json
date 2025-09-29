@@ -24,12 +24,12 @@
           "url": "/artikel/lagerbestand"
         },
         "setProductPrice": {
-          "method": "PUT",
-          "url": "/verkaufspreise/{sku}/{priceType}/{endpointType}"
+          "method": "POST",
+          "url": "/transferpreise/CreateOrUpdate"
         },
         "setProductData": {
-          "method": "PUT",
-          "url": "/verkaufspreise/{sku}/{priceType}/{endpointType}"
+          "method": "POST",
+          "url": "/transferpreise/CreateOrUpdate"
         },
         "getCustomerOrders": {
           "method": "GET",
