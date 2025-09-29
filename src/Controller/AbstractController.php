@@ -346,7 +346,7 @@ abstract class AbstractController
     /*
      * Convert price data to endpoint format
      */
-    private function convert(array $inputArray, string $articleNumber, float $taxValue = 19)
+    private function convert(array $inputArray, string $articleNumber, float $taxValue = 19): array
     {
         $priceType = array_key_first($inputArray['stueckpreis'] ?? []) ?? '';
         $priceValue = $inputArray['stueckpreis'][$priceType]['value'] ?? 0;
