@@ -84,6 +84,13 @@ class CustomerOrderController extends AbstractController implements PullInterfac
                 $attributeCustomerGroup->setValue(self::CUSTOMER_TYPE_B2B);
                 $order->addAttribute($attributeCustomerGroup);
 
+                if (!empty($orderData['Versandart'])) {
+                    $shippingTypeAttribute = new KeyValueAttribute();
+                    $shippingTypeAttribute->setKey('Versandart');
+                    $shippingTypeAttribute->setValue($orderData['Versandart']);
+                    $order->addAttribute($shippingTypeAttribute);
+                }
+
                 // Shipping address
                 $shippingAddress = new CustomerOrderShippingAddress();
                 $shippingAddress->setCountryIso(!empty($orderData['lieferLand']) ? $orderData['lieferLand'] : 'DE'); // Default to 'DE' if not set
