@@ -81,7 +81,7 @@ class PrimaryKeyMapper implements PrimaryKeyMapperInterface
      */
     public function save(int $type, string $endpointId, int $hostId): bool
     {
-        $statement = $this->pdo->prepare('INSERT INTO mappings (endpoint, host, type) VALUES (?, ?, ?)');
+        $statement = $this->pdo->prepare('INSERT INTO mappings (endpoint, host, type) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE host = VALUES(host)');
         return $statement->execute([$endpointId, $hostId, $type]);
     }
 
