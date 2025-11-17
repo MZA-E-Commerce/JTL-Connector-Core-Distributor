@@ -81,7 +81,7 @@ class CustomerOrderController extends AbstractController implements PullInterfac
 
                 $attributeCustomerGroup = new KeyValueAttribute();
                 $attributeCustomerGroup->setKey('customerGroup');
-                $attributeCustomerGroup->setValue(self::CUSTOMER_TYPE_B2B);
+                $attributeCustomerGroup->setValue(self::CUSTOMER_TYPE_B2B_SHORTCUT);
                 $order->addAttribute($attributeCustomerGroup);
 
                 if (!empty($orderData['versandart'])) {
