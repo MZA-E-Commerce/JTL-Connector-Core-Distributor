@@ -92,7 +92,7 @@ class CustomerOrderController extends AbstractController implements PullInterfac
                 }
 
                 if (!empty($orderData['anmerkung'])) {
-                    $order->setCustomerNote(trim($orderData['anmerkung']));
+                    $order->setNote(trim($orderData['anmerkung']));
                 }
 
                 // Shipping address
