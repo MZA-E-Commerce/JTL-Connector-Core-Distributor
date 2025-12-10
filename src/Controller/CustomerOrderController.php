@@ -91,6 +91,13 @@ class CustomerOrderController extends AbstractController implements PullInterfac
                     $order->addAttribute($shippingTypeAttribute);
                 }
 
+                if (!empty($orderData['kundenNr'])) {
+                    $customerNumberAttribute = new KeyValueAttribute();
+                    $customerNumberAttribute->setKey('kundenNr');
+                    $customerNumberAttribute->setValue($orderData['kundenNr']);
+                    $order->addAttribute($customerNumberAttribute);
+                }
+
                 if (!empty($orderData['anmerkung'])) {
                     $order->setNote(trim($orderData['anmerkung']));
                 }
