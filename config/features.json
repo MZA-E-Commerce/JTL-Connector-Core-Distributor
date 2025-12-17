@@ -117,7 +117,7 @@
         },
         "CustomerOrder": {
             "pull": true,
-            "push": true,
+            "push": false,
             "delete": false
         },
         "CustomerOrderAttr": {
