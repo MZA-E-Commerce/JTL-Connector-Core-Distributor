@@ -34,6 +34,23 @@
         "getCustomerOrders": {
           "method": "GET",
           "url": "/transferauftraege/pending"
+        },
+        "deleteProduct": {
+          "active": false,
+          "method": "POST",
+          "url": "/artikel/delete?auftragsArt=DA"
+        },
+        "getSkuByJtlId": {
+          "active": true,
+          "ignoreMissingSku": true,
+          "method": "GET",
+          "url": "http://mza-nginx/api/jtl/connector/getSkuByJtlId?jtlId={jtlId}",
+          "comment": "Fetches SKU by JTL-ID from PIMCORE API",
+          "key": "1234567890",
+          "basicAuth": {
+            "username": "mza",
+            "password": "xxx"
+          }
         }
       }
     }

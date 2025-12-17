@@ -253,7 +253,7 @@
         "Product": {
             "pull": true,
             "push": true,
-            "delete": false
+            "delete": true
         },
         "Product2Category": {
             "pull": true,

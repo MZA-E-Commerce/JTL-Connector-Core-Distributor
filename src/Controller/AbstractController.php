@@ -135,9 +135,10 @@ abstract class AbstractController
 
     /**
      * @param string $endpointKey
+     * @param bool $addBaseUrl
      * @return string
      */
-    protected function getEndpointUrl(string $endpointKey): string
+    protected function getEndpointUrl(string $endpointKey, bool $addBaseUrl = true): string
     {
         $apiKey = $this->config->get('endpoint.api.key');
         if (empty($apiKey)) {
@@ -145,23 +146,34 @@ abstract class AbstractController
         }
 
         $url = $this->config->get('endpoint.api.url');
-        return $url . $this->config->get('endpoint.api.endpoints.' . $endpointKey . '.url');
+        if ($addBaseUrl) {
+            return $url . $this->config->get('endpoint.api.endpoints.' . $endpointKey . '.url');
+        } else {
+            return $this->config->get('endpoint.api.endpoints.' . $endpointKey . '.url');
+        }
     }
 
     /**
+     * @param string|null $apiKey
+     * @param array $basicAuthData
      * @return HttpClientInterface
      */
-    protected function getHttpClient(): HttpClientInterface
+    protected function getHttpClient(?string $apiKey = null, array $basicAuthData = []): HttpClientInterface
     {
-        $client = HttpClient::create();
-        return $client->withOptions([
+        $options = [
             'headers' => [
-                'X-Api-Key' => $this->config->get('endpoint.api.key'),
+                'X-Api-Key' => $apiKey ?? $this->config->get('endpoint.api.key'),
                 'Content-Type' => 'application/json',
                 'Accept' => 'application/json',
-            ],
-            //'auth_basic' => [$this->config->get('endpoint.api.auth.username'), $this->config->get('endpoint.api.auth.password')]
-        ]);
+            ]
+        ];
+
+        if (!empty($basicAuthData)) {
+            $options['auth_basic'] = $basicAuthData;
+        }
+
+        $client = HttpClient::create();
+        return $client->withOptions($options);
     }
 
     /**
@@ -363,5 +375,96 @@ abstract class AbstractController
             'mwSt' => $taxValue,
             'stSchl' => $taxKey
         ];
+    }
+
+    /**
+     * @param Product $product
+     * @param string $type
+     * @return void
+     * @throws \Throwable
+     */
+    protected function deleteProductEndpoint(Product $product, string $type = 'deleteProduct'): void
+    {
+        $sku = !empty($product->getSku()) ? $product->getSku() : $product->getId()->getEndpoint();
+
+        if (empty($sku)) {
+            try {
+                $sku = $this->getSkuByJtlId($product->getId()->getHost());
+            } catch (\Throwable $e) {
+                $this->logger->error('Error fetching SKU from JTL-ID (PIMCore): ' . $e->getMessage());
+                throw $e;
+            }
+        }
+
+        $postData['jtlId'] = $product->getId()->getHost();
+        $postData['artikelNr'] = $sku; // could be null!
+
+        $client = $this->getHttpClient();
+        $fullApiUrl = $this->getEndpointUrl($type);
+        $httpMethod = $this->config->get('endpoint.api.endpoints.' . $type . '.method');
+        $this->logger->info($httpMethod . ' -> ' . $fullApiUrl . ' -> ' . json_encode($postData));
+
+        $isActive = $this->config->get('endpoint.api.endpoints.' . $type . '.active');
+        if (!$isActive) {
+            $this->logger->info('Skipping delete product (endpoint inactive)');
+            return;
+        }
+
+        try {
+            $response = $client->request($httpMethod, $fullApiUrl, ['json' => $postData]);
+            $statusCode = $response->getStatusCode();
+            $responseData = $response->toArray();
+
+            if ($statusCode === 200 && isset($responseData['artikelNr']) && $responseData['artikelNr'] === $sku) {
+                $this->logger->info('Product deleted successfully (SKU: ' . $sku . ')');
+                return;
+            }
+            throw new \RuntimeException('API error: ' . ($data['error'] ?? 'Unknown error'));
+        } catch (TransportExceptionInterface|HttpExceptionInterface|DecodingExceptionInterface $e) {
+            throw new \RuntimeException('HTTP request failed: ' . $e->getMessage(), 0, $e);
+        }
+    }
+
+    /**
+     * @param int $jtlId
+     * @return string|null
+     */
+    protected function getSkuByJtlId(int $jtlId): ?string
+    {
+        $isActive = $this->config->get('endpoint.api.endpoints.getSkuByJtlId.active');
+        if (!$isActive) {
+            return null;
+        }
+
+        $ignoreMissingSku = $this->config->get('endpoint.api.endpoints.getSkuByJtlId.ignoreMissingSku');
+
+        $url = $this->getEndpointUrl('getSkuByJtlId', false);
+        $fullApiUrl = str_replace('{jtlId}', $jtlId, $url);
+        $apiKey = $this->config->get('endpoint.api.endpoints.getSkuByJtlId.key');
+        $auth = $this->config->get('endpoint.api.endpoints.getSkuByJtlId.basicAuth');
+        $client = $this->getHttpClient($apiKey, $auth);
+
+        try {
+            $response = $client->request($this->config->get('endpoint.api.endpoints.getSkuByJtlId.method'), $fullApiUrl);
+
+            $statusCode = $response->getStatusCode();
+            $data = $response->toArray();
+
+            if ($statusCode === 200 && isset($data['success']) && $data['success'] === true) {
+                return $data['sku'];
+            }
+
+            if ($ignoreMissingSku) {
+                return null;
+            }
+
+            throw new \RuntimeException('Pimcore API error: ' . ($data['error'] ?? 'Unknown error'));
+
+        } catch (TransportExceptionInterface|HttpExceptionInterface|DecodingExceptionInterface $e) {
+            if ($ignoreMissingSku) {
+                return null;
+            }
+            throw new \RuntimeException('HTTP request failed: ' . $e->getMessage(), 0, $e);
+        }
     }
 }
