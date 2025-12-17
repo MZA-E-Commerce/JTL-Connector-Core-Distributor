@@ -151,18 +151,18 @@
             "delete": false
         },
         "DeliveryNote": {
-            "pull": true,
-            "push": true,
+            "pull": false,
+            "push": false,
             "delete": false
         },
         "DeliveryNoteItem": {
-            "pull": true,
-            "push": true,
+            "pull": false,
+            "push": false,
             "delete": false
         },
         "DeliveryNoteItemInfo": {
-            "pull": true,
-            "push": true,
+            "pull": false,
+            "push": false,
             "delete": false
         },
         "FileDownload": {
@@ -246,8 +246,8 @@
             "delete": false
         },
         "Payment": {
-            "pull": true,
-            "push": true,
+            "pull": false,
+            "push": false,
             "delete": false
         },
         "Product": {
