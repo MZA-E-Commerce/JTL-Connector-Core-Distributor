@@ -1,8 +1,8 @@
 {
     "entities": {
         "Category": {
-            "pull": true,
-            "push": true,
+            "pull": false,
+            "push": false,
             "delete": false
         },
         "CategoryAttr": {
