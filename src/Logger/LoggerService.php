@@ -34,7 +34,8 @@ class LoggerService
         CHANNEL_GLOBAL   = 'global',
         CHANNEL_LINKER   = 'linker',
         CHANNEL_RPC      = 'rpc',
-        CHANNEL_SESSION  = 'session';
+        CHANNEL_SESSION  = 'session',
+        CHANNEL_ENDPOINT = 'endpoint';
 
     /** @var MonoLogger[] */
     protected array $channels = [];
