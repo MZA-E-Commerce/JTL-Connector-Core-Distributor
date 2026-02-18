@@ -473,6 +473,7 @@ abstract class AbstractController
         }
 
         foreach ($inputArray[self::SONDERPREIS] ?? [] as $priceType => $priceData) {
+            continue; // No "Sonerpreise" atm.
             $item = [
                 'artikelNr' => $articleNumber,
                 'bezeichnung' => $priceType,
