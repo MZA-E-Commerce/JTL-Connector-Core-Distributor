@@ -13,6 +13,11 @@ class ProductPriceController extends AbstractController
         parent::__construct($config, $logger, $loggerService);
     }
 
+    protected function getBulkType(): ?string
+    {
+        return self::UPDATE_TYPE_PRODUCT_PRICE_BULK ;
+    }
+
     protected function updateModel(Product $model): void
     {
         $this->updateProductEndpoint($model, self::UPDATE_TYPE_PRODUCT_PRICE);
