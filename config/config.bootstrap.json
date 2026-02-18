@@ -16,6 +16,7 @@
   },
   "endpoint": {
     "api": {
+      "useBulk": false,
       "url": "https://test-shop-service.mza-vertrieb.de/api",
       "key": "xxx",
       "endpoints": {
@@ -27,9 +28,17 @@
           "method": "POST",
           "url": "/transferpreise/CreateOrUpdate"
         },
+        "bulkSetProductPrice": {
+          "method": "POST",
+          "url": "/transferpreise/CreateOrUpdateBulk"
+        },
         "setProductData": {
           "method": "POST",
           "url": "/transferpreise/CreateOrUpdate"
+        },
+        "bulkSetProductData": {
+          "method": "POST",
+          "url": "/transferpreise/CreateOrUpdateBulk"
         },
         "getCustomerOrders": {
           "method": "GET",

@@ -32,12 +32,22 @@ abstract class AbstractController
     /**
      * @var string
      */
+    protected const UPDATE_TYPE_PRODUCT_BULK = 'bulkSetProductData';
+
+    /**
+     * @var string
+     */
     protected const UPDATE_TYPE_PRODUCT_STOCK_LEVEL = 'setProductStockLevel';
 
     /**
      * @var string
      */
     protected const UPDATE_TYPE_PRODUCT_PRICE = 'setProductPrice';
+
+    /**
+     * @var string
+     */
+    protected const UPDATE_TYPE_PRODUCT_PRICE_BULK = 'bulkSetProductPrice';
 
     /**
      * @var string
@@ -94,9 +104,14 @@ abstract class AbstractController
      *
      * @param AbstractModel ...$models
      * @return AbstractModel[]
+     * @throws \Exception
      */
     public function push(AbstractModel ...$models): array
     {
+        $useBulk = $this->config->get('endpoint.api.useBulk') ?? false;
+        $bulkType = $this->getBulkType();
+        $bulkItems = [];
+
         foreach ($models as $i => $model) {
             // Check type
             if (!$model instanceof Product) {
@@ -128,14 +143,35 @@ abstract class AbstractController
                 $model->setId($identity);
             }
 
-            // Hook for the update
-            try {
-                $this->updateModel($model);
-            } catch (\Throwable $e) {
-                $this->loggerService->get(LoggerService::CHANNEL_ENDPOINT)->error('Error in updateModel(): ' . $e->getMessage());
+            if ($useBulk && $bulkType !== null) {
+                // Collect data for bulk request
+                try {
+                    $bulkItem = $this->prepareBulkItem($model);
+                    if ($bulkItem !== null) {
+                        $bulkItems[] = $bulkItem;
+                    }
+                } catch (\Throwable $e) {
+                    $this->loggerService->get(LoggerService::CHANNEL_ENDPOINT)->error('Error preparing bulk data for SKU ' . $model->getSku() . ': ' . $e->getMessage());
+                }
+            } else {
+                // Hook for the update (single request per item)
+                try {
+                    $this->updateModel($model);
+                } catch (\Throwable $e) {
+                    $this->loggerService->get(LoggerService::CHANNEL_ENDPOINT)->error('Error in updateModel(): ' . $e->getMessage());
+                }
             }
 
             $models[$i] = $model;
+        }
+
+        // Send bulk request if items were collected
+        if ($useBulk && $bulkType !== null && !empty($bulkItems)) {
+            try {
+                $this->sendBulkRequest($bulkItems, $bulkType);
+            } catch (\Throwable $e) {
+                $this->loggerService->get(LoggerService::CHANNEL_ENDPOINT)->error('Bulk request failed: ' . $e->getMessage());
+            }
         }
 
         return $models;
@@ -505,6 +541,110 @@ abstract class AbstractController
                 return null;
             }
             throw new \RuntimeException('HTTP request failed: ' . $e->getMessage(), 0, $e);
+        }
+    }
+
+    /**
+     * Returns the update type for bulk requests, or null if bulk is not supported by this controller.
+     *
+     * @return string|null
+     */
+    protected function getBulkType(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * Prepares a single product's price data for a bulk request.
+     *
+     * @param Product $product
+     * @return array|null
+     * @throws \Exception
+     */
+    private function prepareBulkItem(Product $product): ?array
+    {
+        $priceTypes = $this->config->get('priceTypes');
+        $postDataPrices = $this->getPrices($product, $priceTypes);
+
+        if (empty($postDataPrices)) {
+            return null;
+        }
+
+        $converted = $this->convert($postDataPrices, $product->getSku(), $product->getVat());
+
+        if ($converted['stueckpreis'] <= 0) {
+            $this->loggerService->get(LoggerService::CHANNEL_ENDPOINT)->info(
+                'Skipping bulk item for price type ' . $converted['bezeichnung'] . ' with value ' . $converted['stueckpreis'] . ' (SKU: ' . $product->getSku() . ')'
+            );
+            return null;
+        }
+
+        return $converted;
+    }
+
+    /**
+     * Sends a bulk request with multiple price items to the API.
+     *
+     * @param array $bulkItems Array of converted price data items
+     * @param string $type The endpoint type (setProductPrice or setProductData)
+     * @return void
+     * @throws \Exception
+     */
+    private function sendBulkRequest(array $bulkItems, string $type): void
+    {
+        $httpMethod = $this->config->get('endpoint.api.endpoints.' . $type . '.method');
+        $client = $this->getHttpClient();
+        $fullApiUrl = $this->getEndpointUrl($type);
+
+        $this->loggerService->get(LoggerService::CHANNEL_ENDPOINT)->info(
+            'Sending bulk request with ' . count($bulkItems) . ' items to ' . $fullApiUrl
+        );
+
+        $serverName = $_SERVER['SERVER_NAME'] ?? gethostname();
+        if ($serverName == 'jtl-connector.docker') {
+            $logFile = '/var/www/html/var/log/bulkPostDataPrices.log';
+        } else {
+            $logFile = '/home/www/p689712/html/prod.jtl-connector-haendlershop/var/log/bulkPostDataPrices.log';
+            if (str_contains($fullApiUrl, 'test-shop-service')) {
+                $logFile = '/home/www/p689712/html/jtl-connector-haendlershop/var/log/bulkPostDataPrices.log';
+            }
+        }
+
+        file_put_contents($logFile, 'BulkPostData: ' . PHP_EOL . '
+                | Date: ' . date('d.m.Y H:i:s') . '
+                | Method: ' . $httpMethod . '
+                | Type: ' . $type . ' (BULK)
+                | URL: ' . $fullApiUrl . '
+                | ItemCount: ' . count($bulkItems) . '
+                | Data: ' . print_r($bulkItems, true) . PHP_EOL, FILE_APPEND);
+
+        $startTime = microtime(true);
+        try {
+            $response = $client->request($httpMethod, $fullApiUrl, ['json' => $bulkItems]);
+            $statusCode = $response->getStatusCode();
+            $responseData = $response->toArray();
+
+            $elapsed = round(microtime(true) - $startTime, 2);
+            $this->loggerService->get(LoggerService::CHANNEL_ENDPOINT)->info(
+                'Bulk request completed (status: ' . $statusCode . ', items: ' . count($bulkItems) . ', duration: ' . $elapsed . 's)'
+            );
+
+            file_put_contents($logFile, 'Bulk response: status=' . $statusCode . ', duration=' . $elapsed . 's, response=' . print_r($responseData, true) . PHP_EOL . PHP_EOL, FILE_APPEND);
+
+        } catch (TransportExceptionInterface $e) {
+            $elapsed = round(microtime(true) - $startTime, 2);
+            $this->loggerService->get(LoggerService::CHANNEL_ENDPOINT)->error(sprintf(
+                'TIMEOUT/Transport error after %ss for bulk %s %s: %s',
+                $elapsed, $httpMethod, $fullApiUrl, $e->getMessage()
+            ));
+            throw new \RuntimeException('Bulk HTTP request failed (timeout/transport): ' . $e->getMessage(), 0, $e);
+        } catch (HttpExceptionInterface|DecodingExceptionInterface $e) {
+            $elapsed = round(microtime(true) - $startTime, 2);
+            $this->loggerService->get(LoggerService::CHANNEL_ENDPOINT)->error(sprintf(
+                'HTTP error after %ss for bulk %s %s: %s',
+                $elapsed, $httpMethod, $fullApiUrl, $e->getMessage()
+            ));
+            throw new \RuntimeException('Bulk HTTP request failed: ' . $e->getMessage(), 0, $e);
         }
     }
 }
