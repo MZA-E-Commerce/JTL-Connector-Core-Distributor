@@ -146,9 +146,9 @@ abstract class AbstractController
             if ($useBulk && $bulkType !== null) {
                 // Collect data for bulk request
                 try {
-                    $bulkItem = $this->prepareBulkItem($model);
-                    if ($bulkItem !== null) {
-                        $bulkItems[] = $bulkItem;
+                    $items = $this->prepareBulkItem($model);
+                    if (!empty($items)) {
+                        $bulkItems = array_merge($bulkItems, $items);
                     }
                 } catch (\Throwable $e) {
                     $this->loggerService->get(LoggerService::CHANNEL_ENDPOINT)->error('Error preparing bulk data for SKU ' . $model->getSku() . ': ' . $e->getMessage());
@@ -453,6 +453,45 @@ abstract class AbstractController
         ];
     }
 
+    private function convertForBulk(array $inputArray, string $articleNumber, float $taxValue = 19): array
+    {
+        $taxKey = array_search($taxValue, self::MAPPING_TAX_CLASSES);
+        if ($taxKey === false) {
+            $taxKey = '1';
+        }
+
+        $items = [];
+
+        foreach ($inputArray[self::STUECKPREIS] ?? [] as $priceType => $priceData) {
+            $items[] = [
+                'artikelNr' => $articleNumber,
+                'bezeichnung' => $priceType,
+                'stueckpreis' => $priceData['value'] ?? 0,
+                'mwSt' => $taxValue,
+                'stSchl' => $taxKey,
+            ];
+        }
+
+        foreach ($inputArray[self::SONDERPREIS] ?? [] as $priceType => $priceData) {
+            $item = [
+                'artikelNr' => $articleNumber,
+                'bezeichnung' => $priceType,
+                'stueckpreis' => $priceData['value'] ?? 0,
+                'mwSt' => $taxValue,
+                'stSchl' => $taxKey,
+            ];
+            if (isset($priceData['von'])) {
+                $item['von'] = $priceData['von'];
+            }
+            if (isset($priceData['bis'])) {
+                $item['bis'] = $priceData['bis'];
+            }
+            $items[] = $item;
+        }
+
+        return $items;
+    }
+
     /**
      * @param Product $product
      * @param string $type
@@ -556,29 +595,53 @@ abstract class AbstractController
 
     /**
      * Prepares a single product's price data for a bulk request.
+     * Returns an array of converted items (one per price type).
      *
      * @param Product $product
-     * @return array|null
+     * @return array
      * @throws \Exception
      */
-    private function prepareBulkItem(Product $product): ?array
+    private function prepareBulkItem(Product $product): array
     {
         $priceTypes = $this->config->get('priceTypes');
         $postDataPrices = $this->getPrices($product, $priceTypes);
+        $tmpUpeData = [];
+
+        // Add UPE data for product bulk updates (mirrors UPDATE_TYPE_PRODUCT logic in updateProductEndpoint)
+        if ($this->getBulkType() === self::UPDATE_TYPE_PRODUCT_BULK) {
+            $useGrossPrices = $this->config->get('useGrossPrices');
+            if ($useGrossPrices) {
+                $uvpNet = $product->getRecommendedRetailPrice();
+                if (!is_null($uvpNet)) {
+                    $vat = $product->getVat();
+                    $uvpGross = $uvpNet * (1 + $vat / 100);
+                    $tmpUpeData[self::STUECKPREIS][$priceTypes['UPE']] = [
+                        "value" => round($uvpGross, 4)
+                    ];
+                }
+            } else {
+                $tmpUpeData[self::STUECKPREIS][$priceTypes['UPE']] = [
+                    "value" => $product->getRecommendedRetailPrice()
+                ];
+            }
+            $postDataPrices = array_merge_recursive($tmpUpeData, $postDataPrices);
+        }
 
         if (empty($postDataPrices)) {
-            return null;
+            return [];
         }
 
-        $converted = $this->convert($postDataPrices, $product->getSku(), $product->getVat());
+        $items = $this->convertForBulk($postDataPrices, $product->getSku(), $product->getVat());
 
-        if ($converted['stueckpreis'] <= 0) {
-            $this->loggerService->get(LoggerService::CHANNEL_ENDPOINT)->info(
-                'Logging bulk item for price type ' . $converted['bezeichnung'] . ' with value ' . $converted['stueckpreis'] . ' (SKU: ' . $product->getSku() . ')'
-            );
+        foreach ($items as $item) {
+            if ($item['stueckpreis'] <= 0) {
+                $this->loggerService->get(LoggerService::CHANNEL_ENDPOINT)->info(
+                    'Logging bulk item for price type ' . $item['bezeichnung'] . ' with value ' . $item['stueckpreis'] . ' (SKU: ' . $product->getSku() . ')'
+                );
+            }
         }
 
-        return $converted;
+        return $items;
     }
 
     /**
