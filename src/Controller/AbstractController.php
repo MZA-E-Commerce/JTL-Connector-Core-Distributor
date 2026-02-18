@@ -574,9 +574,8 @@ abstract class AbstractController
 
         if ($converted['stueckpreis'] <= 0) {
             $this->loggerService->get(LoggerService::CHANNEL_ENDPOINT)->info(
-                'Skipping bulk item for price type ' . $converted['bezeichnung'] . ' with value ' . $converted['stueckpreis'] . ' (SKU: ' . $product->getSku() . ')'
+                'Logging bulk item for price type ' . $converted['bezeichnung'] . ' with value ' . $converted['stueckpreis'] . ' (SKU: ' . $product->getSku() . ')'
             );
-            return null;
         }
 
         return $converted;
