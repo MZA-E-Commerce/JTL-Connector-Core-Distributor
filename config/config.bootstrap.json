@@ -47,7 +47,8 @@
         "deleteProduct": {
           "active": false,
           "method": "POST",
-          "url": "/artikel/delete?auftragsArt=DA"
+          "url": "/transferartikelfreigaben/CreateOrUpdate",
+          "auftragsArt": "WA"
         },
         "getSkuByJtlId": {
           "active": true,
