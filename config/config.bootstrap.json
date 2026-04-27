@@ -14,6 +14,7 @@
     "MZA B2B": "VK4",
     "UPE": "VK23"
   },
+  "auftragsArt": "WA",
   "endpoint": {
     "api": {
       "useBulk": false,

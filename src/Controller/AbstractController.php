@@ -353,6 +353,9 @@ abstract class AbstractController
                 if ($statusCode === 200 && isset($responseData['artikelNr']) && $responseData['artikelNr'] === $product->getSku()) {
                     $elapsed = round(microtime(true) - $startTime, 2);
                     $this->loggerService->get(LoggerService::CHANNEL_ENDPOINT)->info('Product updated successfully (SKU: ' . $product->getSku() . ', duration: ' . $elapsed . 's)');
+
+                    $this->deleteProductsEndpoint([$product], true);
+
                     return;
                 }
 
@@ -717,8 +720,12 @@ abstract class AbstractController
      * @return void
      * @throws \Throwable
      */
-    protected function deleteProductsEndpoint(array $products, string $type = 'deleteProduct'): void
+    protected function deleteProductsEndpoint(array $products, string $type = 'deleteProduct', $value = false): void
     {
+        // DELETE IS HANDLED BY JTL DIRECTLY! Nothing to do here!
+        $this->loggerService->get(LoggerService::CHANNEL_DELETE)->info('Product will NOT deleted at this point! JTL handles "Freigabe" directly!');
+        return;
+
         if (empty($products)) {
             return;
         }
@@ -748,7 +755,7 @@ abstract class AbstractController
             $items[] = [
                 'artikelNr' => $sku,
                 'vertriebskanal' => $salesChannel,
-                'freigabe' => false,
+                'freigabe' => $value,
             ];
         }
 
