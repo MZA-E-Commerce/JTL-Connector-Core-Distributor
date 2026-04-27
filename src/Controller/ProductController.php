@@ -34,19 +34,24 @@ class ProductController extends AbstractController implements DeleteInterface
      */
     public function delete(AbstractModel ...$models): array
     {
+        $products = [];
         foreach ($models as $model) {
             if (!$model instanceof Product) {
-                $this->loggerService->get(LoggerService::CHANNEL_ENDPOINT)->error('Invalid model type. Expected Product, got ' . get_class($model));
+                $this->logger->error('Invalid model type. Expected Product, got ' . get_class($model));
                 continue;
             }
 
-            $this->loggerService->get(LoggerService::CHANNEL_ENDPOINT)->info(\sprintf(
+            $this->logger->info(\sprintf(
                 'Product delete requested (host=%d, sku/endpoint=%s)',
                 $model->getId()->getHost(),
                 $model->getId()->getEndpoint()
             ));
 
-            $this->deleteProductEndpoint($model);
+            $products[] = $model;
+        }
+
+        if (!empty($products)) {
+            $this->deleteProductsEndpoint($products);
         }
 
         return $models;
